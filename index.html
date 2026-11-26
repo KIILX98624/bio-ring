@@ -42,6 +42,7 @@
 @media(max-width:700px){.gamer-showcase{grid-template-columns:1fr}.gamer-visual{min-height:240px;gap:10px}.gamer-hand svg{width:min(100%,150px)}}
 
 .component-detail{margin-top:16px;padding:15px;border:1px solid rgba(138,240,207,.25);border-radius:13px;background:#071720}.component-detail strong{display:block;color:var(--mint);font:700 13px Manrope;margin-bottom:6px}.component-detail span{display:block;color:#a6bfbc;font-size:11px;line-height:1.65}.component-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.component-option{display:flex;align-items:center;gap:8px;text-align:left;min-width:0;padding:9px;border:1px solid var(--line);border-radius:10px;background:#091923;color:#bfd0ce;font:500 10px "DM Sans",sans-serif}.component-option.active,.component-option:hover{border-color:var(--mint);background:#8af0cf12}.component-option .dot{flex:0 0 8px;width:8px;height:8px}.component-option span{display:block}.component-option small{display:block;color:#718b8c;font-size:9px;margin-top:3px}@media(max-width:520px){.component-options{grid-template-columns:1fr}}
+.model-canvas{position:relative}.model-callouts{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}.model-callouts .callout-line{stroke:#8af0cf;stroke-width:1.2;opacity:.9}.model-callouts .callout-dot{fill:#8af0cf;stroke:#071018;stroke-width:1.5}.model-callouts .callout-bg{fill:#071820;fill-opacity:.92;stroke:#8af0cf;stroke-opacity:.38}.model-callouts .callout-text{fill:#eafff8;font:600 10px 'DM Sans',sans-serif;letter-spacing:.1px}@media(max-width:520px){.model-callouts .callout-text{font-size:8px}}
 </style>
 <script type="importmap">{"imports":{"three":"https://esm.sh/three@0.160.0","three/addons/":"https://esm.sh/three@0.160.0/examples/jsm/"}}</script>
 </head>
@@ -77,6 +78,25 @@ function makeRing(containerId,interactive){
  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(host.clientWidth,host.clientHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;host.appendChild(renderer.domElement);
  scene.add(new THREE.HemisphereLight(0xc8fff2,0x15212a,2.0));const key=new THREE.DirectionalLight(0xd7fff4,3.2);key.position.set(3,4,4);scene.add(key);const rim=new THREE.PointLight(0x53e6cb,22,8);rim.position.set(-3,1,-2);scene.add(rim);const blue=new THREE.PointLight(0x4f9bff,10,7);blue.position.set(2,-2,2);scene.add(blue);
  const root=new THREE.Group();scene.add(root);const parts={};
+ const overlay=document.createElementNS("http://www.w3.org/2000/svg","svg");overlay.setAttribute("class","model-callouts");overlay.setAttribute("aria-hidden","true");host.appendChild(overlay);
+ const calloutNames={band:"Anel externo",inner:"Revestimento interno",ppg:"Sensor óptico PPG",temp:"Sensor de temperatura",accel:"Acelerômetro",gyro:"Giroscópio",touch:"Área de toque",bluetooth:"Bluetooth LE",board:"Placa eletrônica",battery:"Bateria",contacts:"Contatos de carga"};
+ const calloutOrder=["band","inner","ppg","temp","accel","gyro","touch","bluetooth","board","battery","contacts"];
+ const svgEl=(tag,attrs)=>{const el=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el};
+ const calloutEls={};
+ for(const keyName of calloutOrder){const g=svgEl("g",{}),line=svgEl("line",{class:"callout-line"}),dot=svgEl("circle",{class:"callout-dot",r:3}),bg=svgEl("rect",{class:"callout-bg",rx:5,height:20}),txt=svgEl("text",{class:"callout-text","dominant-baseline":"middle"});txt.textContent=calloutNames[keyName];g.append(line,dot,bg,txt);overlay.appendChild(g);calloutEls[keyName]={g,line,dot,bg,txt};}
+ function updateCallouts(){
+  const w=host.clientWidth,hh=host.clientHeight;overlay.setAttribute("viewBox",`0 0 ${w} ${hh}`);overlay.style.display=exploded?"block":"none";
+  if(!exploded)return;
+  const v=new THREE.Vector3();const rowH=hh/(calloutOrder.length+1);
+  calloutOrder.forEach((keyName,i)=>{const obj=parts[keyName],els=calloutEls[keyName];if(!obj)return;
+   obj.getWorldPosition(v);v.project(camera);const ax=(v.x*.5+.5)*w,ay=(-v.y*.5+.5)*hh;
+   const left=i%2===0,x=left?8:w-8,y=rowH*(i+1),labelW=Math.min(118,Math.max(76,calloutNames[keyName].length*5.8+15)),rectX=left?0:w-labelW-8,rectY=y-10;
+   els.line.setAttribute("x1",Math.max(0,Math.min(w,ax)));els.line.setAttribute("y1",Math.max(0,Math.min(hh,ay)));els.line.setAttribute("x2",left?rectX+labelW:rectX);els.line.setAttribute("y2",y);
+   els.dot.setAttribute("cx",Math.max(0,Math.min(w,ax)));els.dot.setAttribute("cy",Math.max(0,Math.min(hh,ay)));
+   els.bg.setAttribute("x",rectX);els.bg.setAttribute("y",rectY);els.bg.setAttribute("width",labelW);
+   els.txt.setAttribute("x",left?rectX+7:rectX+labelW-7);els.txt.setAttribute("y",y);els.txt.setAttribute("text-anchor",left?"start":"end");
+  });
+ }
  const shape=new THREE.Shape();shape.absarc(0,0,1.05,0,Math.PI*2,false);const hole=new THREE.Path();hole.absarc(0,0,.82,0,Math.PI*2,true);shape.holes.push(hole);
  const geo=new THREE.ExtrudeGeometry(shape,{depth:.32,bevelEnabled:true,bevelSegments:4,steps:1,bevelSize:.035,bevelThickness:.035,curveSegments:96});geo.translate(0,0,-.16);
  const metal=new THREE.MeshPhysicalMaterial({color:0x687982,metalness:.94,roughness:.2,clearcoat:1,clearcoatRoughness:.13});
@@ -99,10 +119,10 @@ function makeRing(containerId,interactive){
  else {camera.position.set(3.1,2.1,4.8);}
  let spinning=true,exploded=false;const assembled={};for(const [k,obj] of Object.entries(parts)){assembled[k]=obj.position.clone();}
  const explodedPositions={band:new THREE.Vector3(0,0,0),inner:new THREE.Vector3(0,0,.18),ppg:new THREE.Vector3(0,0,-.7),board:new THREE.Vector3(0,1.65,0),battery:new THREE.Vector3(0,-1.65,0),temp:new THREE.Vector3(-1.3,-1.1,.3),accel:new THREE.Vector3(1.3,1.1,.3),gyro:new THREE.Vector3(.9,1.85,.35),touch:new THREE.Vector3(0,2.05,.55),bluetooth:new THREE.Vector3(-.9,1.85,.35),contacts:new THREE.Vector3(0,-1.25,.5)};
- function setExploded(v){exploded=v;for(const [k,obj] of Object.entries(parts)){obj.position.copy(v?explodedPositions[k]:assembled[k]);} }
+ function setExploded(v){exploded=v;for(const [k,obj] of Object.entries(parts)){obj.position.copy(v?explodedPositions[k]:assembled[k]);}updateCallouts();}
  function resize(){const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h)}
  const ro=new ResizeObserver(resize);ro.observe(host);
- function animate(){requestAnimationFrame(animate);if(spinning&&!interactive)root.rotation.y+=.004;if(interactive&&spinning&&!controls.enabled)root.rotation.y+=.004;if(controls)controls.update();renderer.render(scene,camera)}animate();
+ function animate(){requestAnimationFrame(animate);if(spinning&&!interactive)root.rotation.y+=.004;if(interactive&&spinning&&!controls.enabled)root.rotation.y+=.004;if(controls)controls.update();renderer.render(scene,camera);updateCallouts()}animate();
  return {root,controls,setExploded,get spinning(){return spinning},toggleSpin(){spinning=!spinning;if(controls)controls.autoRotate=spinning;return spinning},reset(){if(controls){controls.reset();camera.position.set(3.2,2.2,4.6)}root.rotation.set(.72,.12,-.18);setExploded(false)}};
 }
 const hero=makeRing("hero3d",false);const model=makeRing("model3d",true);
